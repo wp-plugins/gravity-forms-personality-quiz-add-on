@@ -124,21 +124,57 @@ if (class_exists("GFForms")) {
         protected function score_quiz_numeric($form_settings, $fields, $lead) {
             $score = 0;
             foreach ($fields as $field) {
-                if (array_key_exists('enablePersonalityQuiz', $field) && $field['enablePersonalityQuiz']) {
-                    if ($field['type'] === "checkbox") {
-                        foreach ($field['inputs'] as $input) {
-                            if (array_key_exists($input['id'], $lead)) {
-                                $score += intval($lead[$input['id']]);
+
+                // newer GF uses objects instead of arrays
+
+                if (is_array($field)) {
+                    if (array_key_exists('enablePersonalityQuiz', $field) && $field['enablePersonalityQuiz']) {
+                        if ($field['type'] === "checkbox") {
+                            foreach ($field['inputs'] as $input) {
+                                if (array_key_exists($input['id'], $lead)) {
+                                    $score += $this->extract_field_score($lead[$input['id']]);
+                                }
+                            }
+                        } else if ($field['type'] === "radio" ) {
+                            if (array_key_exists($field['id'], $lead)) {
+                                $score += $this->extract_field_score($lead[$field['id']]);
                             }
                         }
-                    } else if ($field['type'] === "radio" ) {
-                        if (array_key_exists($field['id'], $lead)) {
-                            $score += intval($lead[$field['id']]);
+                    }
+                } else {
+                    if (property_exists($field, 'enablePersonalityQuiz') && $field->enablePersonalityQuiz) {
+                        if ($field->type === "checkbox") {
+                            foreach ($field->inputs as $input) {
+                                if (array_key_exists($input['id'], $lead)) {
+                                    $score += $this->extract_field_score($lead[$input['id']]);
+                                }
+                            }
+                        } else if ($field->type === "radio" ) {
+                            if (array_key_exists($field->id, $lead)) {
+                                $score += $this->extract_field_score($lead[$field['id']]);
+                            }
                         }
                     }
                 }
             }
             return $score;
+        }
+
+        protected function extract_field_score($value) {
+            // The score can be defined by ending the value with curly braces
+            // and a number between them - e.g. {3}
+            if ( strpos($value, '}') === (strlen($value) - 1) ) {
+                $last_curly = strrpos($value,'{');
+                $value = substr($value, $last_curly);
+                $value = trim($value,"{}");
+            }
+
+            // If the value is just a number, return it
+            if (ctype_digit($value)) {
+                return intval($value);
+            }
+
+            return 0;
         }
 
         public function add_enable_checkbox($position, $form_id) {
@@ -282,8 +318,8 @@ if (class_exists("GFForms")) {
             ?>
 
             <script type="text/javascript">
-                gform.addFilter("gform_merge_tags", "add_merge_tags");
-                function add_merge_tags(mergeTags, elementId, hideAllFields, excludeFieldTypes, isPrepop, option){
+                gform.addFilter("gform_merge_tags", "add_personality_quiz_merge_tags");
+                function add_personality_quiz_merge_tags(mergeTags, elementId, hideAllFields, excludeFieldTypes, isPrepop, option){
                     mergeTags["custom"].tags.push({ tag: '{personality_quiz_result}', label: 'Personality Quiz Result' });
                     mergeTags["custom"].tags.push({ tag: '{personality_quiz_result_percent}', label: 'Personality Quiz Result Percent' });
 
